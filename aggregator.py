@@ -10,6 +10,62 @@ class Artist:
         self.id = id
         self.name = name
 
+    def __str__(self):
+        return f'{self.name} ({self.id})'
+
+class Track:
+    def __init__(self, id, name, artist):
+        self.id = id
+        self.name = name
+        self.artist = artist
+    
+    def __str__(self):
+        return f'{self.name} - {self.artist.name} ({self.id})'
+
+def deserialize_artist(json_data):
+    return Artist(json_data['id'], json_data['name']) 
+
+def deserialize_track(json_data, artist):
+    return Track(json_data['id'], json_data['name'], artist)
+
+def get_related_artists(seed_artist, max_depth, max_neighbors):
+    artist_queue = queue.Queue()
+    artist_queue.put((seed_artist, 0))
+    visited = set([seed_artist.id])
+    artists = []
+
+    while not artist_queue.empty():
+        artist, depth = artist_queue.get()
+        artists.append(artist)
+
+        if depth < MAX_DEPTH:
+            related_artists_data = client.artist_related_artists(artist.id)['artists']
+            related = [
+                deserialize_artist(artist_data)
+                for artist_data 
+                in related_artists_data]
+
+            neighbors_visited = 0
+
+            for related_artist in related:
+                if neighbors_visited == (MAX_NEIGHBORS - 1):
+                    break
+                if related_artist.id not in visited:
+                    artist_queue.put((related_artist, depth + 1))
+                    visited.add(related_artist.id)
+                    neighbors_visited += 1
+
+    return artists
+
+def get_artist_tracks(artist, count):
+        artist_tracks_data = client.artist_top_tracks(artist.id)['tracks']
+        artist_tracks = [
+            deserialize_track(track_data, artist)
+            for track_data
+            in artist_tracks_data[:count]]
+
+        return artist_tracks
+
 if __name__ == '__main__':
     # The maximum distance from the seed artist that the algorithm will search.
     MAX_DEPTH = 3
@@ -17,6 +73,9 @@ if __name__ == '__main__':
     # The maximum number of related artists that will be included in the search
     # for each artist.
     MAX_NEIGHBORS = 3
+
+    # The number of tracks that are pulled from each artist's top tracks.
+    TRACKS_PER_ARTIST = 5
 
     if len(sys.argv) < 2:
         print('Usage: python3 aggregator.py <artist id>')
@@ -36,35 +95,21 @@ if __name__ == '__main__':
             print(f'{key} missing from config.json!')
             sys.exit(1)
 
-    creds = SpotifyClientCredentials(
+    credentials = SpotifyClientCredentials(
         config['SPOTIFY_CLIENT_ID'],
         config['SPOTIFY_CLIENT_SECRET'])
         
-    client = Spotify(client_credentials_manager=creds)
+    client = Spotify(client_credentials_manager=credentials)
 
-    artist_data = client.artist(seed_artist_id)
-    seed_artist = Artist(seed_artist_id, artist_data['name'])
-    artist_queue = queue.Queue()
-    artist_queue.put((seed_artist, 0))
-    visited = set([seed_artist.id])
+    seed_artist_data = client.artist(seed_artist_id)
+    seed_artist = deserialize_artist(seed_artist_data)
 
-    while not artist_queue.empty():
-        artist, depth = artist_queue.get()
-        print(artist.name)
-        
-        if depth < MAX_DEPTH:
-            related_artists_data = client.artist_related_artists(artist.id)['artists']
-            related = [
-                Artist(artist_data['id'], artist_data['name']) 
-                for artist_data 
-                in related_artists_data]
+    artists = get_related_artists(seed_artist, MAX_DEPTH, MAX_NEIGHBORS)
+    tracks = []
 
-            neighbors_visited = 0
-
-            for related_artist in related:
-                if neighbors_visited == (MAX_NEIGHBORS - 1):
-                    break
-                if related_artist.id not in visited:
-                    artist_queue.put((related_artist, depth + 1))
-                    visited.add(related_artist.id)
-                    neighbors_visited += 1
+    for artist in artists:
+        artist_tracks = get_artist_tracks(artist, TRACKS_PER_ARTIST)
+        tracks.extend(artist_tracks)
+    
+    for track in tracks:
+        print(track)
