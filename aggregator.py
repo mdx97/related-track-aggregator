@@ -11,7 +11,11 @@ class Artist:
         self.name = name
 
 if __name__ == '__main__':
+    # The maximum distance from the seed artist that the algorithm will search.
     MAX_DEPTH = 3
+
+    # The maximum number of related artists that will be included in the search
+    # for each artist.
     MAX_NEIGHBORS = 3
 
     if len(sys.argv) < 2:
@@ -27,13 +31,10 @@ if __name__ == '__main__':
     config_file = open('config.json', 'r')
     config = json.load(config_file)
 
-    if 'SPOTIFY_CLIENT_ID' not in config:
-        print('SPOTIFY_CLIENT_ID missing from config.json')
-        sys.exit(1)
-
-    if 'SPOTIFY_CLIENT_SECRET' not in config:
-        print('SPOTIFY_CLIENT_SECRET missing from config.json')
-        sys.exit(1)
+    for key in ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET']:
+        if key not in config:
+            print(f'{key} missing from config.json!')
+            sys.exit(1)
 
     creds = SpotifyClientCredentials(
         config['SPOTIFY_CLIENT_ID'],
@@ -52,12 +53,18 @@ if __name__ == '__main__':
         print(artist.name)
         
         if depth < MAX_DEPTH:
-            related_artist_data = client.artist_related_artists(artist.id)['artists']
-            related = [Artist(artist_data['id'], artist_data['name']) for artist_data in related_artist_data]
+            related_artists_data = client.artist_related_artists(artist.id)['artists']
+            related = [
+                Artist(artist_data['id'], artist_data['name']) 
+                for artist_data 
+                in related_artists_data]
 
-            for i, related_artist in enumerate(related):
-                if i == (MAX_NEIGHBORS - 1):
+            neighbors_visited = 0
+
+            for related_artist in related:
+                if neighbors_visited == (MAX_NEIGHBORS - 1):
                     break
                 if related_artist.id not in visited:
                     artist_queue.put((related_artist, depth + 1))
                     visited.add(related_artist.id)
+                    neighbors_visited += 1
