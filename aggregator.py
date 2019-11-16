@@ -31,7 +31,8 @@ def deserialize_track(json_data: dict, artist: Artist) -> Track:
     '''Creates an Track object from json.'''
     return Track(json_data['id'], json_data['name'], artist)
 
-def get_related_artists(seed_artist: Artist, max_depth: int, max_neighbors: int) -> List[Artist]:
+def get_related_artists(spotify_client: Spotify, seed_artist: Artist,
+                        max_depth: int, max_neighbors: int) -> List[Artist]:
     '''Starting at a "seed" artist, performs a breadth first search to find related artists.'''
     artist_queue = queue.Queue()
     artist_queue.put((seed_artist, 0))
@@ -42,8 +43,8 @@ def get_related_artists(seed_artist: Artist, max_depth: int, max_neighbors: int)
         artist, depth = artist_queue.get()
         artists.append(artist)
 
-        if depth < MAX_DEPTH:
-            related_artists_data = client.artist_related_artists(artist.id)['artists']
+        if depth < max_depth:
+            related_artists_data = spotify_client.artist_related_artists(artist.id)['artists']
             related = [
                 deserialize_artist(artist_data)
                 for artist_data 
@@ -52,7 +53,7 @@ def get_related_artists(seed_artist: Artist, max_depth: int, max_neighbors: int)
             neighbors_visited = 0
 
             for related_artist in related:
-                if neighbors_visited == (MAX_NEIGHBORS - 1):
+                if neighbors_visited == max_neighbors:
                     break
                 if related_artist.id not in visited:
                     artist_queue.put((related_artist, depth + 1))
@@ -61,9 +62,9 @@ def get_related_artists(seed_artist: Artist, max_depth: int, max_neighbors: int)
 
     return artists
 
-def get_artist_tracks(artist: Artist, count: int) -> List[Track]:
+def get_artist_tracks(spotify_client: Spotify, artist: Artist, count: int) -> List[Track]:
     '''Gets a list of an artist's top tracks.'''
-    artist_tracks_data = client.artist_top_tracks(artist.id)['tracks']
+    artist_tracks_data = spotify_client.artist_top_tracks(artist.id)['tracks']
     artist_tracks = [
         deserialize_track(track_data, artist)
         for track_data
@@ -109,11 +110,11 @@ if __name__ == '__main__':
     seed_artist_data = client.artist(seed_artist_id)
     seed_artist = deserialize_artist(seed_artist_data)
 
-    artists = get_related_artists(seed_artist, MAX_DEPTH, MAX_NEIGHBORS)
+    artists = get_related_artists(client, seed_artist, MAX_DEPTH, MAX_NEIGHBORS)
     tracks = []
 
     for artist in artists:
-        artist_tracks = get_artist_tracks(artist, TRACKS_PER_ARTIST)
+        artist_tracks = get_artist_tracks(client, artist, TRACKS_PER_ARTIST)
         tracks.extend(artist_tracks)
     
     for track in tracks:
