@@ -1,12 +1,13 @@
 from spotipy.client import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
+from typing import List
 import json
 import os
 import queue
 import sys
 
 class Artist:
-    def __init__(self, id, name):
+    def __init__(self, id: str, name: str):
         self.id = id
         self.name = name
 
@@ -14,7 +15,7 @@ class Artist:
         return f'{self.name} ({self.id})'
 
 class Track:
-    def __init__(self, id, name, artist):
+    def __init__(self, id: str, name: str, artist: Artist):
         self.id = id
         self.name = name
         self.artist = artist
@@ -22,13 +23,16 @@ class Track:
     def __str__(self):
         return f'{self.name} - {self.artist.name} ({self.id})'
 
-def deserialize_artist(json_data):
+def deserialize_artist(json_data: dict) -> Artist:
+    '''Creates an Artist object from json.'''
     return Artist(json_data['id'], json_data['name']) 
 
-def deserialize_track(json_data, artist):
+def deserialize_track(json_data: dict, artist: Artist) -> Track:
+    '''Creates an Track object from json.'''
     return Track(json_data['id'], json_data['name'], artist)
 
-def get_related_artists(seed_artist, max_depth, max_neighbors):
+def get_related_artists(seed_artist: Artist, max_depth: int, max_neighbors: int) -> List[Artist]:
+    '''Starting at a "seed" artist, performs a breadth first search to find related artists.'''
     artist_queue = queue.Queue()
     artist_queue.put((seed_artist, 0))
     visited = set([seed_artist.id])
@@ -57,14 +61,15 @@ def get_related_artists(seed_artist, max_depth, max_neighbors):
 
     return artists
 
-def get_artist_tracks(artist, count):
-        artist_tracks_data = client.artist_top_tracks(artist.id)['tracks']
-        artist_tracks = [
-            deserialize_track(track_data, artist)
-            for track_data
-            in artist_tracks_data[:count]]
+def get_artist_tracks(artist: Artist, count: int) -> List[Track]:
+    '''Gets a list of an artist's top tracks.'''
+    artist_tracks_data = client.artist_top_tracks(artist.id)['tracks']
+    artist_tracks = [
+        deserialize_track(track_data, artist)
+        for track_data
+        in artist_tracks_data[:count]]
 
-        return artist_tracks
+    return artist_tracks
 
 if __name__ == '__main__':
     # The maximum distance from the seed artist that the algorithm will search.
@@ -113,3 +118,4 @@ if __name__ == '__main__':
     
     for track in tracks:
         print(track)
+    
