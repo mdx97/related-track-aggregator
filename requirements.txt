@@ -3,5 +3,5 @@ chardet==3.0.4
 idna==2.8
 pkg-resources==0.0.0
 requests==2.22.0
-spotipy==2.4.4
+spotipy==2.22.1
 urllib3==1.25.7
